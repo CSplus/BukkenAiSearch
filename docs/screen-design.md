@@ -13,20 +13,21 @@ MVPでは以下に絞る。
 - 物件詳細からClaude相談
 - 候補物件保存
 - 会話履歴保存
-- 最小限のログイン/ログアウト
+- 社内ユーザー向けログイン/ログアウト
+
+一般ユーザーによるサインアップは提供しない。ユーザーアカウントは管理者が作成・管理する。
 
 ## 1. 画面一覧
 
 | No | Bubble page名 | 画面名 | 目的 | MVP |
 |---:|---|---|---|---|
-| 1 | `login` | ログイン画面 | 営業担当者がログインする | 対象 |
-| 2 | `signup` | サインアップ画面 | 初回ユーザー登録を行う | 対象 |
-| 3 | `index` | ダッシュボード | 最近の会話・候補物件・物件検索導線を表示する | 対象 |
-| 4 | `property_search` | 物件検索画面 | `PropertyRegistry` から候補物件を検索する | 対象 |
-| 5 | `property_detail` | 物件詳細画面 | 物件・所有者・権利関係を確認しClaudeへ相談する | 対象 |
-| 6 | `ai_chat` | AIチャット画面 | Claudeと会話し、調査内容を整理する | 対象 |
-| 7 | `candidate_properties` | 候補物件一覧画面 | 保存した候補物件を一覧・確認する | 対象 |
-| 8 | `search_conditions` | 調査条件管理画面 | 物件検索条件を保存・再利用する | 簡易対象 |
+| 1 | `login` | ログイン画面 | 管理者が作成した社内ユーザーがログインする | 対象 |
+| 2 | `index` | ダッシュボード | 最近の会話・候補物件・物件検索導線を表示する | 対象 |
+| 3 | `property_search` | 物件検索画面 | `PropertyRegistry` から候補物件を検索する | 対象 |
+| 4 | `property_detail` | 物件詳細画面 | 物件・所有者・権利関係を確認しClaudeへ相談する | 対象 |
+| 5 | `ai_chat` | AIチャット画面 | Claudeと会話し、調査内容を整理する | 対象 |
+| 6 | `candidate_properties` | 候補物件一覧画面 | 保存した候補物件を一覧・確認する | 対象 |
+| 7 | `search_conditions` | 調査条件管理画面 | 物件検索条件を保存・再利用する | 簡易対象 |
 
 ### MVP対象外画面
 
@@ -34,6 +35,7 @@ MVPでは以下に絞る。
 
 | Bubble page名 | 画面名 | 理由 |
 |---|---|---|
+| `user_admin` | ユーザー管理画面 | 社内ユーザー作成・権限管理用。MVPではBubble管理画面で代替可能 |
 | `knowledge` | Knowledge資料管理画面 | MVPではClaudeへ固定プロンプトを渡す運用で開始可能 |
 | `ai_projects` | AIプロジェクト設定画面 | MVPでは既存active設定または固定設定で開始可能 |
 | `registry_import` | 登記データ取込画面 | MVPでは手動投入またはBubble標準CSV投入で開始可能 |
@@ -129,7 +131,7 @@ CandidateProperty作成
 
 ### 目的
 
-営業担当者がメールアドレス・パスワードでログインする。
+管理者が作成した社内ユーザーがメールアドレス・パスワードでログインする。
 
 ### UI構成
 
@@ -138,7 +140,7 @@ CandidateProperty作成
 | メイン | Input email | メールアドレス入力 |
 | メイン | Input password | パスワード入力 |
 | メイン | Button login | ログイン実行 |
-| メイン | Link signup | サインアップ画面へ遷移 |
+| メイン | Text account_notice | アカウントが必要な場合は管理者へ連絡する旨を表示 |
 | メイン | Alert/Text | ログインエラー表示 |
 
 ### 使用Data Type
@@ -154,40 +156,8 @@ CandidateProperty作成
 | Button login clicked | Log the user in |
 | Login success | Go to page `index` |
 | Login failed | エラーメッセージ表示 |
-| Link signup clicked | Go to page `signup` |
 
-## 4.2 `signup` / サインアップ画面
-
-### 目的
-
-初回ユーザー登録を行う。
-
-### UI構成
-
-| エリア | UI要素 | 内容 |
-|---|---|---|
-| メイン | Input name | ユーザー名 |
-| メイン | Input email | メールアドレス |
-| メイン | Input password | パスワード |
-| メイン | Button signup | 登録実行 |
-| メイン | Link login | ログイン画面へ戻る |
-
-### 使用Data Type
-
-| Data Type | 用途 |
-|---|---|
-| `User` | 新規ユーザー作成、`name`設定 |
-
-### 実行Workflow
-
-| Trigger | Workflow |
-|---|---|
-| Button signup clicked | Sign the user up |
-| Signup success | Make changes to Current User: `name`, `role = 営業担当者`, `is_admin = no` |
-| Signup success | Go to page `index` |
-| Link login clicked | Go to page `login` |
-
-## 4.3 `index` / ダッシュボード
+## 4.2 `index` / ダッシュボード
 
 ### 目的
 
@@ -235,7 +205,7 @@ CandidateProperty作成
 | RG recent_conversations cell clicked | Go to page `ai_chat`, Data to send = Current cell's Conversation |
 | RG recent_candidates cell clicked | Go to page `property_detail`, Data to send = Current cell's CandidateProperty's property |
 
-## 4.4 `property_search` / 物件検索画面
+## 4.3 `property_search` / 物件検索画面
 
 ### 目的
 
@@ -307,7 +277,7 @@ MVPでは以下を優先する。
 | Button add_candidate clicked | Create new `CandidateProperty` with Current cell's PropertyRegistry |
 | Button ask_claude clicked | Create new `Conversation` with `target_property` → Go to page `ai_chat` |
 
-## 4.5 `property_detail` / 物件詳細画面
+## 4.4 `property_detail` / 物件詳細画面
 
 ### 目的
 
@@ -393,7 +363,7 @@ MVPでは以下を優先する。
 - 発行日
 - PDFリンク
 
-## 4.6 `ai_chat` / AIチャット画面
+## 4.5 `ai_chat` / AIチャット画面
 
 ### 目的
 
@@ -472,7 +442,7 @@ MVPでは以下を渡す。
 4. 必要に応じて `Conversation.related_properties`
 5. ユーザーの今回入力
 
-## 4.7 `candidate_properties` / 候補物件一覧画面
+## 4.6 `candidate_properties` / 候補物件一覧画面
 
 ### 目的
 
@@ -525,7 +495,7 @@ MVPでは以下を渡す。
 | Priority changed | Make changes to Current cell's CandidateProperty.priority |
 | Button remove clicked | Delete Current cell's CandidateProperty or set status = 除外 |
 
-## 4.8 `search_conditions` / 調査条件管理画面
+## 4.7 `search_conditions` / 調査条件管理画面
 
 ### 目的
 
@@ -576,7 +546,6 @@ MVPでは以下を渡す。
 | 画面 | User | PropertyRegistry | Conversation | Message | CandidateProperty | SearchCondition | InvestigationNote | AiProject | KnowledgeDocument |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | `login` | ○ |  |  |  |  |  |  |  |  |
-| `signup` | ○ |  |  |  |  |  |  |  |  |
 | `index` | ○ | ○ | ○ |  | ○ |  |  |  |  |
 | `property_search` | ○ | ○ | ○ | ○ | ○ | ○ |  |  |  |
 | `property_detail` | ○ | ○ | ○ | ○ | ○ |  | ○ |  |  |
@@ -588,8 +557,7 @@ MVPでは以下を渡す。
 
 | 画面 | 主なWorkflow |
 |---|---|
-| `login` | ログイン、ログイン後ダッシュボード遷移 |
-| `signup` | サインアップ、User追加情報保存、ダッシュボード遷移 |
+| `login` | 管理者が作成した社内ユーザーのログイン、ログイン後ダッシュボード遷移 |
 | `index` | 新規会話作成、物件検索遷移、候補物件遷移、最近の会話再開 |
 | `property_search` | 物件検索、検索条件保存、物件詳細遷移、候補追加、Claude相談開始 |
 | `property_detail` | 物件情報表示、候補追加、Claude相談開始、関連会話表示 |
@@ -601,7 +569,7 @@ MVPでは以下を渡す。
 
 ### Phase 1: 最小導線
 
-1. `login` / `signup`
+1. `login`
 2. `index`
 3. `property_search`
 4. `property_detail`
@@ -619,9 +587,16 @@ MVPでは以下を渡す。
 2. `InvestigationNote` の簡易保存
 3. AI回答から調査メモ保存
 
+### MVP後: 管理者向けユーザー管理
+
+1. `user_admin`
+2. 社内ユーザー作成・停止
+3. `role` / `is_admin` / `is_active` の管理
+
 ## 8. 画面設計上の注意点
 
 - CRMではないため、顧客詳細画面、商談詳細画面、追客履歴画面、契約管理画面はMVPでは作らない。
+- 社内向けシステムのため、一般ユーザー向けサインアップ画面はMVPでは作らない。ユーザーアカウントは管理者が作成・管理する。
 - `PropertyRegistry` の検索・詳細・Claude相談を最短導線にする。
 - 所有者情報・抵当権情報は個人情報やセンシティブ情報を含む可能性があるため、Privacy Rulesとログイン必須制御を前提にする。
 - Claude回答は法的判断ではなく、調査支援・論点整理として表示する。
