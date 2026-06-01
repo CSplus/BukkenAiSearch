@@ -14,8 +14,10 @@ MVPでは以下に絞る。
 - 候補物件保存
 - 会話履歴保存
 - 社内ユーザー向けログイン/ログアウト
+- 管理者によるログインユーザー管理
+- 管理者による `PropertyRegistry` 全レコード差し替え更新
 
-一般ユーザーによるサインアップは提供しない。ユーザーアカウントは管理者が作成・管理する。
+一般ユーザーによるサインアップは提供しない。ユーザーアカウントは管理者が `admin` 画面から作成・削除・管理する。
 
 ## 1. 画面一覧
 
@@ -28,6 +30,7 @@ MVPでは以下に絞る。
 | 5 | `ai_chat` | AIチャット画面 | Claudeと会話し、調査内容を整理する | 対象 |
 | 6 | `candidate_properties` | 候補物件一覧画面 | 保存した候補物件を一覧・確認する | 対象 |
 | 7 | `search_conditions` | 調査条件管理画面 | 物件検索条件を保存・再利用する | 簡易対象 |
+| 8 | `admin` | 管理者画面 | 管理者がログインユーザー管理と物件データベース更新を行う | 対象 |
 
 ### MVP対象外画面
 
@@ -35,10 +38,8 @@ MVPでは以下に絞る。
 
 | Bubble page名 | 画面名 | 理由 |
 |---|---|---|
-| `user_admin` | ユーザー管理画面 | 社内ユーザー作成・権限管理用。MVPではBubble管理画面で代替可能 |
 | `knowledge` | Knowledge資料管理画面 | MVPではClaudeへ固定プロンプトを渡す運用で開始可能 |
 | `ai_projects` | AIプロジェクト設定画面 | MVPでは既存active設定または固定設定で開始可能 |
-| `registry_import` | 登記データ取込画面 | MVPでは手動投入またはBubble標準CSV投入で開始可能 |
 | `investigation_notes` | 調査メモ一覧画面 | MVPでは物件詳細・候補物件内のメモ表示から開始可能 |
 
 ## 2. 画面遷移図
@@ -65,8 +66,12 @@ MVPでは以下に絞る。
    ├─ 候補物件を見る ───────────▶ [candidate_properties]
    │                                  └─ 物件詳細 ─────────▶ [property_detail]
    │
-   └─ 条件管理 ─────────────────▶ [search_conditions]
-                                      └─ 条件で検索 ───────▶ [property_search]
+   ├─ 条件管理 ─────────────────▶ [search_conditions]
+   │                                  └─ 条件で検索 ───────▶ [property_search]
+   │
+   └─ 管理者画面 ※is_adminのみ ─▶ [admin]
+                                      ├─ ユーザー管理
+                                      └─ PropertyRegistry全差し替え更新
 ```
 
 ### 2.2 物件検索からClaude相談までの主要導線
@@ -117,6 +122,7 @@ CandidateProperty作成
 | グローバルナビ | Link/Button | ダッシュボード、物件検索、AIチャット、候補物件 |
 | ユーザー表示 | Text | Current User's nameまたはemail |
 | ログアウト | Button | ログアウトWorkflow |
+| 管理者画面リンク | Link/Button | `Current User's is_admin = yes` の場合のみ表示し、`admin` へ遷移 |
 
 ### 3.2 共通のData Source方針
 
@@ -541,29 +547,93 @@ MVPでは以下を渡す。
 | Button edit clicked | Show Popup condition_form with Current cell's SearchCondition |
 | Button delete clicked | Delete Current cell's SearchCondition |
 
+## 4.8 `admin` / 管理者画面
+
+### 目的
+
+管理者がログインユーザー管理と物件データベース更新を行う。
+
+### アクセス制御
+
+| 条件 | 動作 |
+|---|---|
+| Current User is logged out | `login` へ遷移 |
+| Current User's is_admin is no | `index` へ遷移 |
+| Current User's is_admin is yes | `admin` を表示 |
+
+### UI構成
+
+| エリア | UI要素 | 内容 |
+|---|---|---|
+| ヘッダー | Text title | 管理者画面 |
+| ヘッダー | Button back_index | ダッシュボードへ戻る |
+| ユーザー管理 | RG users | ユーザー一覧表示 |
+| ユーザー管理 | Button new_user | 新規ユーザー登録 |
+| ユーザー管理 | Popup user_form | ユーザー登録・編集フォーム |
+| ユーザー管理 | Button delete_user | ユーザー削除 |
+| ユーザー管理 | Toggle is_admin | 管理者権限の付与/解除 |
+| ユーザー管理 | Toggle is_active | 利用停止フラグの管理 |
+| DB更新 | FileUploader registry_file | Claude Codeで不動産登記簿謄本から抽出したExcel/CSVをアップロード |
+| DB更新 | RG mapping_rows | Excel/CSVカラムと `PropertyRegistry` Fieldのマッピング |
+| DB更新 | Button preview_import | インポート前確認 |
+| DB更新 | Button replace_all | 全レコード差し替え実行 |
+| DB更新 | Popup confirm_replace | 全差し替え確認ダイアログ |
+| DB更新履歴 | RG import_logs | ImportLog一覧 |
+
+### 使用Data Type
+
+| Data Type | 用途 |
+|---|---|
+| `User` | ログインユーザー管理 |
+| `PropertyRegistry` | 全レコード差し替え対象 |
+| `ImportLog` | 物件DB更新履歴 |
+
+### 実行Workflow
+
+| Trigger | Workflow |
+|---|---|
+| Page is loaded | If Current User is logged out → Go to page `login` |
+| Page is loaded | If Current User's is_admin is no → Go to page `index` |
+| Button new_user clicked | Show Popup `user_form` |
+| Button save_user clicked | Create new User or Make changes to selected User |
+| Button delete_user clicked | Show confirm delete dialog |
+| Confirm delete user clicked | Delete selected User |
+| Toggle is_admin changed | Make changes to User's `is_admin` |
+| Toggle is_active changed | Make changes to User's `is_active` |
+| FileUploader registry_file changed | Store uploaded file |
+| Button preview_import clicked | Show mapping preview |
+| Button replace_all clicked | Show Popup `confirm_replace` |
+| Confirm replace clicked | Create `ImportLog` with status = running |
+| Confirm replace clicked | Delete all existing `PropertyRegistry` records |
+| Confirm replace clicked | Import uploaded file rows as new `PropertyRegistry` records |
+| Import completed | Update `ImportLog.imported_count`, `error_count`, `status`, `executed_at` |
+| Import failed | Update `ImportLog.status = failed`, `memo` |
+
 ## 5. MVP画面別Data Type対応表
 
-| 画面 | User | PropertyRegistry | Conversation | Message | CandidateProperty | SearchCondition | InvestigationNote | AiProject | KnowledgeDocument |
-|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| `login` | ○ |  |  |  |  |  |  |  |  |
-| `index` | ○ | ○ | ○ |  | ○ |  |  |  |  |
-| `property_search` | ○ | ○ | ○ | ○ | ○ | ○ |  |  |  |
-| `property_detail` | ○ | ○ | ○ | ○ | ○ |  | ○ |  |  |
-| `ai_chat` | ○ | ○ | ○ | ○ | ○ |  | ○ | ○ | ○ |
-| `candidate_properties` | ○ | ○ | ○ |  | ○ |  |  |  |  |
-| `search_conditions` | ○ |  |  |  |  | ○ |  |  |  |
+| 画面 | User | PropertyRegistry | Conversation | Message | CandidateProperty | SearchCondition | InvestigationNote | AiProject | KnowledgeDocument | ImportLog |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| `login` | ○ |  |  |  |  |  |  |  |  |  |
+| `index` | ○ | ○ | ○ |  | ○ |  |  |  |  |  |
+| `property_search` | ○ | ○ | ○ | ○ | ○ | ○ |  |  |  |  |
+| `property_detail` | ○ | ○ | ○ | ○ | ○ |  | ○ |  |  |  |
+| `ai_chat` | ○ | ○ | ○ | ○ | ○ |  | ○ | ○ | ○ |  |
+| `candidate_properties` | ○ | ○ | ○ |  | ○ |  |  |  |  |  |
+| `search_conditions` | ○ |  |  |  |  | ○ |  |  |  |  |
+| `admin` | ○ | ○ |  |  |  |  |  |  |  | ○ |
 
 ## 6. MVP画面別Workflow対応表
 
 | 画面 | 主なWorkflow |
 |---|---|
 | `login` | 管理者が作成した社内ユーザーのログイン、ログイン後ダッシュボード遷移 |
-| `index` | 新規会話作成、物件検索遷移、候補物件遷移、最近の会話再開 |
+| `index` | 新規会話作成、物件検索遷移、候補物件遷移、最近の会話再開、管理者のみadmin遷移 |
 | `property_search` | 物件検索、検索条件保存、物件詳細遷移、候補追加、Claude相談開始 |
 | `property_detail` | 物件情報表示、候補追加、Claude相談開始、関連会話表示 |
 | `ai_chat` | Message保存、Claude API実行、Claude回答保存、候補追加、調査メモ保存 |
 | `candidate_properties` | 候補一覧表示、ステータス更新、優先度更新、物件詳細遷移、関連会話遷移 |
 | `search_conditions` | 条件作成、条件編集、条件削除、条件で物件検索 |
+| `admin` | ユーザー作成・削除・権限管理、PropertyRegistry全削除、Excel/CSV取込、ImportLog保存 |
 
 ## 7. 実装優先順位
 
@@ -571,9 +641,10 @@ MVPでは以下を渡す。
 
 1. `login`
 2. `index`
-3. `property_search`
-4. `property_detail`
-5. `ai_chat`
+3. `admin`
+4. `property_search`
+5. `property_detail`
+6. `ai_chat`
 
 ### Phase 2: 候補管理
 
@@ -587,17 +658,19 @@ MVPでは以下を渡す。
 2. `InvestigationNote` の簡易保存
 3. AI回答から調査メモ保存
 
-### MVP後: 管理者向けユーザー管理
+### Phase 1.5: 管理者機能
 
-1. `user_admin`
-2. 社内ユーザー作成・停止
-3. `role` / `is_admin` / `is_active` の管理
+1. `User` 管理
+2. `ImportLog` 作成
+3. `PropertyRegistry` 全差し替え更新
 
 ## 8. 画面設計上の注意点
 
 - CRMではないため、顧客詳細画面、商談詳細画面、追客履歴画面、契約管理画面はMVPでは作らない。
-- 社内向けシステムのため、一般ユーザー向けサインアップ画面はMVPでは作らない。ユーザーアカウントは管理者が作成・管理する。
+- 社内向けシステムのため、一般ユーザー向けサインアップ画面はMVPでは作らない。ユーザーアカウントは管理者が `admin` 画面で作成・削除・管理する。
 - `PropertyRegistry` の検索・詳細・Claude相談を最短導線にする。
 - 所有者情報・抵当権情報は個人情報やセンシティブ情報を含む可能性があるため、Privacy Rulesとログイン必須制御を前提にする。
+- `admin` 画面は `Current User's is_admin = yes` のユーザーのみアクセス可能とし、非管理者は `index` にリダイレクトする。
+- `PropertyRegistry` 全差し替え更新は管理者のみ実行可能とし、実行前に確認ダイアログを必ず表示する。
 - Claude回答は法的判断ではなく、調査支援・論点整理として表示する。
 - Bubbleではページ遷移時にData to sendを使い、`property_detail` は `PropertyRegistry`、`ai_chat` は `Conversation` をType of contentにする。
