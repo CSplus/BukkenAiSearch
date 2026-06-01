@@ -16,7 +16,7 @@
 1. CRMではなく、自然言語による対話型登記DB検索システムとして定義する
 2. 中核目的は、営業担当者がClaudeへ自然文で検索指示を行い、`PropertyRegistry` を検索・追加絞り込みできることとする
 3. Claudeの主な役割は、自然文を `PropertyRegistry` の検索条件に変換し、既存条件へ追加・削除・更新することである
-4. `PropertyRegistry` を中核データとし、検索結果を会話の文脈として保持する
+4. `PropertyRegistry` を中核データとし、検索条件・条件履歴・分析結果を会話の文脈として保持する
 5. 必要に応じてClaudeが検索結果を要約・比較・優先順位付けする
 6. 顧客管理・商談管理・追客管理・契約管理は主目的にしない
 7. MVPは、自然言語検索セッション、`PropertyRegistry` 最小版、検索結果表示、追加絞り込み、候補物件保存、管理者画面までとする
@@ -33,7 +33,7 @@ Bubble実装では、要件確認、DB設計、API設計、画面設計、Workfl
 
 - 自然文で `PropertyRegistry` を検索する
 - 前回検索結果に対して追加条件を自然文で指定し、既存条件に追加して再検索する
-- 検索条件と検索結果を会話型検索セッションとして保持する
+- 検索条件、追加絞り込み履歴、表示設定、分析結果を会話型検索セッションとして保持する
 - 検索結果から所有者、土地、建物、収益区分、抵当権などを確認する
 - 必要に応じて検索結果をClaudeに要約・比較・優先順位付けさせる
 - 有望な検索結果を候補物件として保存する
@@ -94,7 +94,7 @@ Claudeが検索意図を解析し、PropertyRegistry検索条件へ変換
         ↓
 BubbleがPropertyRegistryを検索
         ↓
-検索結果をConversation / SearchConditionの文脈として保持
+検索条件をConversation / SearchConditionの文脈として保持し、検索結果は都度PropertyRegistryを再検索して表示
         ↓
 営業担当者が追加条件を自然文で指定
         ↓
@@ -103,7 +103,7 @@ Claudeが既存条件に追加・削除・更新して再検索
 必要に応じてClaudeが結果を要約・比較・優先順位付け
 ```
 
-登記データ本体はKnowledge資料ではなく、検索可能な構造化DBである `PropertyRegistry` として扱う。AIチャットと `PropertyRegistry` 検索は分離せず、同一の `Conversation` に検索指示、検索条件、検索結果、分析結果を保持する。
+登記データ本体はKnowledge資料ではなく、検索可能な構造化DBである `PropertyRegistry` として扱う。Claudeとの会話と `PropertyRegistry` 検索は分離せず、`ai_search` 画面上の同一 `Conversation` に検索指示、検索条件、条件チップ、分析結果を保持する。検索結果全件は `Conversation` に保存せず、現在条件に基づき毎回 `PropertyRegistry` を再検索して表示する。
 
 ## 6. ユーザーの利用シナリオ
 
@@ -132,13 +132,13 @@ Claudeが既存条件に追加・削除・更新して再検索
 | 「法人所有だけにして」 | 既存条件 + `owner_type = 法人所有` |
 | 「所有者を表示して」 | 現在の検索結果に `owner_name` / `owner_address` を表示 |
 
-### 6.3 検索条件と検索結果を会話文脈として保持する
+### 6.3 検索条件と表示・分析文脈を会話に保持する
 
-1つの検索セッションは `Conversation` として管理し、初回検索条件、追加絞り込み条件、検索結果、Claudeの解釈結果を保持する。
+1つの検索セッションは `Conversation` として管理し、初回検索条件、追加絞り込み条件、表示設定、Claudeの解釈結果を保持する。検索結果全件は保持しない。
 
 - 初回検索: `SearchCondition` を作成
 - 追加絞り込み: 既存 `SearchCondition` に条件を追加・更新
-- 検索結果: `Conversation.current_search_results` または関連フィールドに保持
+- 検索結果: 全件は保存せず、現在の `SearchCondition` / `SearchConditionItem` から毎回 `PropertyRegistry` を再検索して表示
 - ユーザー自然文とClaude解釈: `Message` として保存
 
 ### 6.4 検索結果を分析する
@@ -239,7 +239,7 @@ Claudeは以下を最終判断しない。
 - 不要な会話の削除
 - 会話と対象物件・候補物件の紐づけ
 - 会話と現在の `SearchCondition` の紐づけ
-- 会話に現在の検索結果を保持
+- 会話には検索結果全件を保持せず、検索条件と表示設定のみ保持
 - 初回検索と追加絞り込みの履歴保存
 
 ### 物件条件管理
@@ -337,39 +337,13 @@ Claudeが参照する補助資料を管理する。
 - 物件調査に関する補足資料
 - 調査手順
 
-登記データ本体はKnowledge資料ではなく、検索可能な物件DBとして分離して扱う。
 登記データ本体はKnowledge資料ではなく、`PropertyRegistry` として分離して扱う。
 
-### 登記物件DB連携
 ## 9. データ要件
 
-将来的に、登記PDF由来のExcel/CSVデータを `PropertyRegistry` としてDB化し、売買物件・収益物件探索に利用する。
-
-主な項目候補:
 主なData Type:
 
-- 地域
-- 種別
-- PDFリンク
-- 不動産番号
-- 所在
-- 地番
-- 家屋番号
-- 建物名
-- 地目
-- 建物種別
-- 用途分類
-- 収益区分
-- 構造
-- 階数
-- 土地面積
-- 建物面積
-- 延床面積
-- 専有面積
-- 所有者情報
-- 権利関係
-- 抵当権情報
-- 発行日
+登記データ本体はKnowledge資料ではなく、検索可能な物件DBとして分離して扱う。
 - `User`
 - `Conversation`
 - `Message`
@@ -408,7 +382,8 @@ Claudeが参照する補助資料を管理する。
 | `project` | AiProject | 使用するAIプロジェクト設定 |
 | `status` | text | 調査中/保留/完了など |
 | `current_search_condition` | SearchCondition | 現在の検索条件 |
-| `current_search_results` | list of PropertyRegistry | 現在の検索結果 |
+| `current_result_count` | number | 現在条件でのヒット件数。検索結果全件は保存しない |
+| `current_display_fields` | list of text | 検索結果一覧に表示する列 |
 
 ### 9.3 Message
 
@@ -509,6 +484,8 @@ Claudeが参照する補助資料を管理する。
 | `condition_history_json` | text | 追加絞り込み履歴JSON |
 | `last_refinement_text` | text | 最後の追加条件自然文 |
 | `result_count` | number | 現在条件での検索件数 |
+| `display_fields` | list of text | 検索結果一覧に表示する列 |
+| `sort_instruction` | text | 並び替え・優先順位付け指示 |
 | `memo` | text | 調査メモ |
 
 ### 9.7 SearchConditionItem
@@ -585,9 +562,9 @@ Claudeが参照する補助資料を管理する。
 
 ### 10.1 Claude API
 
-### 候補物件検索・比較
+### 登記物件DB連携
 - Bubble API ConnectorからClaude APIを呼び出す
-- ユーザーの現在入力だけでなく、同一会話の検索条件・検索結果・メッセージ履歴を渡す
+- ユーザーの現在入力だけでなく、同一会話の検索条件、表示中の検索結果概要、メッセージ履歴を渡す
 - 自然文検索時は、Claudeに検索条件JSONのみを返させる
 - 追加絞り込み時は、既存 `SearchCondition` と追加自然文を渡し、マージ後の条件JSONを返させる
 - 必要に応じて `PropertyRegistry` の対象物件情報を渡す
@@ -596,11 +573,49 @@ Claudeが参照する補助資料を管理する。
 - Claude回答を `Message` として保存する
 - APIエラー時はエラー内容を記録し、ユーザーに分かる形で通知する
 
-登記物件DB連携後、顧客条件に合う候補をBubble側で絞り込み、AIへ候補情報を渡して比較・営業コメント生成に利用する。
+将来的に、登記PDF由来のExcel/CSVデータを `PropertyRegistry` としてDB化し、売買物件・収益物件探索に利用する。
 ### 10.2 Claudeへ渡す相談テンプレート
 
-主な検索・比較観点:
+主な項目候補:
 物件詳細からClaudeに相談する場合、以下のような構造で文脈を渡す。
+
+- 地域
+- 種別
+- PDFリンク
+- 不動産番号
+- 所在
+- 地番
+- 家屋番号
+- 建物名
+- 地目
+- 建物種別
+- 用途分類
+- 収益区分
+- 構造
+- 階数
+- 土地面積
+- 建物面積
+- 延床面積
+- 専有面積
+- 所有者情報
+- 権利関係
+- 抵当権情報
+- 発行日
+```text
+あなたは不動産営業担当者の調査支援AIです。
+以下の登記情報・物件情報をもとに、営業担当者が次に判断すべきことを整理してください。
+
+### 候補物件検索・比較
+# 物件情報
+...
+
+登記物件DB連携後、顧客条件に合う候補をBubble側で絞り込み、AIへ候補情報を渡して比較・営業コメント生成に利用する。
+# 所有者情報
+...
+
+主な検索・比較観点:
+# 権利関係
+...
 
 - エリア
 - 予算
@@ -612,23 +627,6 @@ Claudeが参照する補助資料を管理する。
 - 収益区分
 - 権利関係
 - 抵当権等の注意点
-```text
-あなたは不動産営業担当者の調査支援AIです。
-以下の登記情報・物件情報をもとに、営業担当者が次に判断すべきことを整理してください。
-
-### 提案文作成
-# 物件情報
-...
-
-AI回答や候補物件情報をもとに、営業担当者が顧客へ送る提案文の作成を支援する。
-# 所有者情報
-...
-
-## 画面要件
-# 権利関係
-...
-
-### ダッシュボード
 # 出力してほしい内容
 1. 物件概要
 2. 所有者確認ポイント
@@ -638,14 +636,33 @@ AI回答や候補物件情報をもとに、営業担当者が顧客へ送る提
 6. アプローチ前の確認事項
 ```
 
+### 提案文作成
+## 11. 画面要件
+
+AI回答や候補物件情報をもとに、営業担当者が顧客へ送る提案文の作成を支援する。
+### 11.1 画面一覧
+
+## 画面要件
+MVP画面は以下の6画面とする。`property_search` と `search_conditions` は作らず、検索と会話を `ai_search` に統合する。
+
+### ダッシュボード
+| No | Bubble page名 | 画面名 | 目的 |
+|---:|---|---|---|
+| 1 | `login` | ログイン画面 | 管理者が作成した社内ユーザーがログインする |
+| 2 | `index` | ダッシュボード | 検索セッション開始、最近のConversation、候補物件、管理者画面導線を表示する |
+| 3 | `ai_search` | 自然言語PropertyRegistry検索セッション画面 | 自然言語検索、追加絞り込み、検索結果表示、Claudeとの会話、候補保存を1画面で行う |
+| 4 | `property_detail` | 物件詳細画面 | 物件・所有者・権利関係を確認し、現在のConversationへ戻って分析できる |
+| 5 | `candidate_properties` | 候補物件一覧画面 | 保存した候補物件を一覧・確認する |
+| 6 | `admin` | 管理者画面 | 管理者がログインユーザー管理と物件データベース更新を行う |
+
 - 最近の会話一覧を表示する
 - 保存済み条件の概要を表示する
 - AIプロジェクト、Knowledge資料への導線を表示する
 - AIチャット開始導線を表示する
-## 11. 画面要件
+### 11.2 削除する画面
 
 ### AIチャット画面
-### 11.1 ダッシュボード
+以下の画面はMVP画面一覧から削除する。
 
 - 会話一覧を表示する
 - チャットメッセージを表示する
@@ -655,61 +672,62 @@ AI回答や候補物件情報をもとに、営業担当者が顧客へ送る提
   - 条件として保存
   - 提案文を作成
   - 比較リストに追加
+| 削除するBubble page名 | 削除理由 |
+|---|---|
+| `property_search` | 検索機能は `ai_search` に統合するため |
+| `search_conditions` | 検索条件は `Conversation.current_search_condition`、`SearchCondition`、`SearchConditionItem` に保持し、独立画面を作らないため |
+
+### 物件条件管理画面
+### 11.3 `index` / ダッシュボード
+
+- 保存済み条件を一覧表示する
+- 条件詳細を確認できる
+- 条件の追加・編集・削除を行える
 - 最近の自然言語検索セッションを表示する
 - 最近見た物件を表示する
 - 保存した候補物件を表示する
-- 調査中の物件を表示する
-- 未確認の権利関係がある物件を表示する
-- 新規検索セッション開始導線を表示する
-- 物件検索導線を表示する
+- 新規 `ai_search` セッション開始導線を表示する
+- 管理者のみ `admin` 画面への導線を表示する
 
-### 物件条件管理画面
-### 11.2 検索セッション会話画面
+### AIプロジェクト設定画面
+### 11.4 `ai_search` / 自然言語PropertyRegistry検索セッション画面
 
-- 保存済み条件を一覧表示する
-- `Conversation` 単位で自然言語検索の会話履歴を表示する
-- ユーザーの検索指示、追加絞り込み指示、表示・分析指示を入力できる
+- AI設定を一覧表示する
+- system prompt 等の設定を管理できる
+- active な設定を切り替えられる
+従来の `ai_chat` と `property_search` を統合したMVP中核画面である。
+
+### Knowledge資料管理画面
+- 左サイドにConversation一覧を表示する
+- 中央上部に現在の検索条件、条件チップ、現在のヒット件数を表示する
+- 中央に現在条件で都度再検索した `PropertyRegistry` 検索結果一覧を表示する
+- 下部に自然言語入力欄と送信ボタンを表示する
+- ユーザーの初回検索指示、追加絞り込み指示、表示列変更指示、分析指示を入力できる
 - Claude APIによる検索条件解釈、条件要約、分析結果を表示・保存する
-- 現在の `SearchCondition` と `SearchConditionItem` を条件チップとして表示する
-- 現在の検索結果件数と `Conversation.current_search_results` を表示する
-- 回答下に以下のアクション導線を表示する
-  - 条件を解除して再検索
-  - 候補物件に追加
-  - 調査メモとして保存
-  - 物件詳細を開く
+- `Conversation` に検索結果全件は保存しない
+- 検索結果一覧には、所在、建物名、所有者、種別、用途分類、面積、抵当権有無を表示する
+- 検索結果行には、詳細表示、候補保存、Claude分析のアクションを表示する
 
-### 11.3 会話型PropertyRegistry検索画面
+- 資料を一覧表示する
+- 資料タイトル、要約、本文、ファイルを管理できる
+- AI参照対象にするかを切り替えられる
+### 11.5 `property_detail` / 物件詳細画面
 
-- 自然文入力から `PropertyRegistry` を検索する
-- 初回検索指示をClaudeが構造化検索条件へ変換する
-- 前回検索結果に対する追加絞り込み指示を受け付ける
-- 既存の `SearchCondition` に条件を追加・削除・更新して再検索する
-- 所在、所有者名、種別、用途分類、収益区分、面積、抵当権有無などを自然文から条件化できる
-- 現在条件を日本語要約と条件チップで表示する
-- 検索結果を同一 `Conversation` の文脈として保持する
-- 検索結果から物件詳細へ遷移できる
-- 検索結果の要約・比較・優先順位付けをClaudeへ依頼できる
-- 検索結果から候補物件に追加できる
+### ログイン・サインアップ画面
+現行設計を維持し、1件の `PropertyRegistry` について基本情報、登記情報、所有者情報、甲区情報、乙区情報、PDFリンク、発行日、調査メモを確認する。
 
-### 11.4 物件詳細画面
-
-- 物件基本情報を表示する
-- 所在情報を表示する
-- 土地情報を表示する
-- 建物情報を表示する
-- 所有者情報を表示する
-- 甲区情報を表示する
-- 乙区情報を表示する
-- PDFリンクを表示する
-- 発行日を表示する
-- Claude要約を表示する
-- 調査メモを表示する
-- Claudeにこの物件を相談できる
+- メールアドレスとパスワードでログインできる
+- 新規ユーザー登録ができる
+- ログアウトできる
+- 「Claude分析」または「検索へ戻る」を押した場合は、新規Conversation作成ではなく現在のConversationへ戻ることを優先する
+- 現在のConversationがない場合のみ、新規Conversationを作成して `ai_search` へ遷移する
 - 候補物件に追加できる
 - 調査メモを追加できる
 
-### 11.5 候補物件リスト画面
+## データ要件
+### 11.6 `candidate_properties` / 候補物件一覧画面
 
+主なData Type:
 - 候補物件一覧を表示する
 - 優先度を表示・編集できる
 - 候補にした理由を表示・編集できる
@@ -718,55 +736,7 @@ AI回答や候補物件情報をもとに、営業担当者が顧客へ送る提
 - 権利関係注意点を表示する
 - 次調査項目を表示する
 - ステータスを表示・編集できる
-- 複数物件をClaudeに比較させる導線を表示する
-
-### 11.6 調査条件管理画面
-
-- 保存済み物件探索条件を一覧表示する
-- 条件詳細を確認できる
-- 条件の追加・編集・削除を行える
-- 条件を使って `PropertyRegistry` を検索できる
-
-### AIプロジェクト設定画面
-### 11.7 AIプロジェクト設定画面
-
-- AI設定を一覧表示する
-- system prompt 等の設定を管理できる
-- active な設定を切り替えられる
-- system prompt等の設定を管理できる
-- activeな設定を切り替えられる
-- 用途別のClaude設定を管理できる
-  - 自然文から `PropertyRegistry` 検索条件へ変換する用途
-  - 前回条件への追加絞り込み・除外条件マージ用
-  - 検索結果の要約・比較・優先順位付け用
-  - 登記読み取り補助用
-  - 調査タスク抽出用
-
-### Knowledge資料管理画面
-### 11.8 Knowledge資料管理画面
-
-- 資料を一覧表示する
-- 資料タイトル、要約、本文、ファイルを管理できる
-- AI参照対象にするかを切り替えられる
-
-### ログイン・サインアップ画面
-### 11.9 登記データ取込画面
-
-- メールアドレスとパスワードでログインできる
-- 新規ユーザー登録ができる
-- ログアウトできる
-MVP後の拡張画面として、Excel/CSVから `PropertyRegistry` に登記データを取り込む画面を検討する。
-
-## データ要件
-- CSVアップロード
-- カラムマッピング
-- 取り込みプレビュー
-- 重複チェック
-- インポート実行
-- インポート履歴確認
-
-主なData Type:
-### 11.10 ログイン画面
+- 関連Conversationまたは物件詳細へ遷移できる
 
 - `User`
 - `Conversation`
@@ -775,27 +745,27 @@ MVP後の拡張画面として、Excel/CSVから `PropertyRegistry` に登記デ
 - `KnowledgeDocument`
 - `SearchCondition`
 - `PropertyRegistry`
+### 11.7 `login` / ログイン画面
+
+## API要件
 - 管理者が作成した社内ユーザーがメールアドレスとパスワードでログインできる
 - 一般ユーザーによるサインアップは提供しない
 - アカウントが必要な場合は管理者へ連絡する旨を表示する
 - ログアウトできる
 
-## API要件
-### 11.11 admin / 管理者画面
+### 11.8 `admin` / 管理者画面
 
 管理者がログインユーザー管理と物件データベース更新を行う。
 
 主な機能:
 
-- ユーザー一覧表示
-- 新規ユーザー登録
+- ユーザー管理
+- 新規ユーザー作成
 - ユーザー削除
-- ユーザー名変更
-- メールアドレス管理
-- 管理者権限の付与/解除
-- 利用停止フラグの管理
-- Claude Codeで不動産登記簿謄本から抽出したExcel/CSVデータのアップロード
-- `PropertyRegistry` の全レコード差し替え更新
+- 利用停止
+- 管理者権限設定
+- Claude Codeで登記簿謄本から抽出したExcel/CSVデータのアップロード
+- `PropertyRegistry` を全件削除してから全件再登録する全差し替え更新
 - Excel/CSVカラムと `PropertyRegistry` Fieldのマッピング
 - インポート件数、エラー件数、実行日時の記録
 - `ImportLog` による物件データベース更新履歴の確認
@@ -808,21 +778,21 @@ MVP後の拡張画面として、Excel/CSVから `PropertyRegistry` に登記デ
 - `owner_user = Current User` を設定する
 - 初期タイトルを設定する
 - `current_search_condition` は空で開始する
-- `current_search_results` は空で開始する
-- 会話型PropertyRegistry検索画面へ遷移する
+- `current_result_count` は0で開始する
+- `ai_search` 画面へ遷移する
 - 作成した `Conversation` を渡す
 
 ### 12.2 自然言語検索メッセージ送信
 
 - ユーザーの自然文を `Message` として保存する
 - 現在の `Conversation.current_search_condition` と過去メッセージを取得する
-- Claude APIへ自然文、既存検索条件、現在の検索結果概要を送信する
+- Claude APIへ自然文、既存検索条件、現在画面に表示中の検索結果概要を送信する
 - Claudeから `intent_type` と検索条件JSONを受け取る
 - `intent_type = initial_search` の場合、新規 `SearchCondition` と `SearchConditionItem` を作成する
 - `intent_type = refine_search` の場合、既存 `SearchCondition` に条件を追加・削除・更新する
 - Bubbleが更新後の条件で `PropertyRegistry` を検索する
-- 検索結果を `Conversation.current_search_results` として保持する
-- 検索件数を `SearchCondition.result_count` と `Message.search_result_count` に保存する
+- 検索結果全件は保存せず、現在条件で `PropertyRegistry` を再検索して画面表示する
+- 検索件数を `SearchCondition.result_count`、`Conversation.current_result_count`、`Message.search_result_count` に保存する
 - Claudeの条件解釈・条件要約を `Message` として保存する
 - `Conversation` の `last_message_text` と `last_message_at` を更新する
 - APIエラー時はエラーメッセージを保存・表示する
@@ -830,9 +800,10 @@ MVP後の拡張画面として、Excel/CSVから `PropertyRegistry` に登記デ
 ### 12.3 検索結果分析
 
 - ユーザーが「有望そうな順に並べて」「所有者を表示して」など分析・表示指示を入力する
-- 現在の `Conversation.current_search_results` を取得する
-- 表示項目変更の場合は、検索結果一覧の表示列を変更する
-- 要約・比較・優先順位付けの場合は、現在の検索結果をClaude APIへ送信する
+- 現在の `SearchCondition` / `SearchConditionItem` で `PropertyRegistry` を再検索し、画面表示中の結果を取得する
+- 表示項目変更の場合は、`Conversation.current_display_fields` を更新し、検索結果一覧の表示列を変更する
+- 要約・比較・優先順位付けの場合は、現在画面に表示中の検索結果または上位N件をClaude APIへ送信する
+- 検索結果全件は `Conversation` に保存しない
 - Claude回答を `Message` として保存する
 - 必要に応じて推奨物件を `CandidateProperty` として保存できる導線を表示する
 
@@ -842,12 +813,12 @@ MVP後の拡張画面として、Excel/CSVから `PropertyRegistry` に登記デ
 - Bubble API ConnectorからClaude APIを呼び出す
 - ユーザーの現在入力だけでなく、同一会話の履歴を渡す
 - 対象の `PropertyRegistry` を取得する
-- 既存の `Conversation` がある場合は、その検索条件・検索結果文脈に対象物件を追加する
+- 既存の `Conversation` がある場合は、その検索条件・分析文脈に対象物件を追加する
 - 既存の `Conversation` がない場合は、新規検索セッションを作成して対象物件を `target_property` に設定する
 - 物件情報、所有者情報、甲区情報、乙区情報をClaude API payloadへ差し込む
 - Claude回答を `Message` として保存する
 - APIエラー時はエラー内容を記録し、ユーザーに分かる形で通知する
-- 必要に応じて `Conversation.current_search_results` に対象物件を含める
+- 検索結果全件として保存せず、対象物件を `target_property` または `related_properties` に紐づける
 
 ## 権限・セキュリティ要件
 ### 12.5 候補物件保存
@@ -918,8 +889,9 @@ MVP後の拡張画面として、Excel/CSVから `PropertyRegistry` に登記デ
 - `admin` 管理者画面
 - `ImportLog` 作成
 - `PropertyRegistry` 最小版の作成
-- 会話型PropertyRegistry検索画面
+- `ai_search` 画面
 - `SearchCondition` / `SearchConditionItem` 作成・更新
+- `PropertyRegistry` の都度再検索による結果表示
 - 物件詳細画面
 - 検索結果のClaude要約・比較・優先順位付け
 - 候補物件保存
@@ -934,7 +906,7 @@ MVP後の拡張画面として、Excel/CSVから `PropertyRegistry` に登記デ
 - Knowledge資料のClaude連携
 - 提案文作成機能
 - 比較リスト機能
-- 検索条件保存の強化
+- 検索セッション条件履歴の強化
 
 ### 優先度 低〜将来対応
 ### 優先度 低 / 将来対応
@@ -967,7 +939,7 @@ MVPのゴールは、営業担当者が自然文で `PropertyRegistry` を検索
 - `SearchCondition` / `SearchConditionItem` 保存
 - `PropertyRegistry` 検索結果表示
 - 追加絞り込み条件のマージ
-- 検索結果を会話文脈として保持
+- 検索条件・表示設定・分析結果を会話文脈として保持し、検索結果全件は保持しない
 
 #### PropertyRegistry最小版
 
@@ -990,7 +962,7 @@ MVPでは、以下の項目を優先して実装する。
 - PDFリンク
 - 発行日
 
-#### 物件検索
+#### ai_searchによる自然言語検索セッション
 
 - 自然文による初回検索
 - 前回検索結果への追加絞り込み
@@ -998,6 +970,7 @@ MVPでは、以下の項目を優先して実装する。
 - 現在条件の日本語要約表示
 - 所有者名、所在地、用途分類、収益区分、抵当権有無などの検索条件化
 - 検索結果に対する所有者表示、要約、比較、優先順位付け
+- 検索結果全件は `Conversation` に保存せず、現在条件で `PropertyRegistry` を都度再検索
 
 #### 物件詳細・検索結果分析
 
