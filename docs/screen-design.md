@@ -107,6 +107,9 @@ owner_type条件を追加して再検索
    │ ユーザー: 「所有者を表示」
    ▼
 表示列を変更
+   │ 気になる所有者を発見
+   ▼
+所有者名で関連物件を深掘り検索
    │
    ├─ 詳細表示 ─────────────▶ [property_detail]
    ├─ 候補保存 ─────────────▶ CandidateProperty作成
@@ -313,13 +316,16 @@ CandidateProperty作成
 
 ### 代表的な自然言語入力と処理
 
-| ユーザー入力 | Claudeの解釈 | Bubble処理 |
-|---|---|---|
-| 中区で収益物件を探して | `location contains 中区` + `income_rank = 収益物件` | `SearchConditionItem` 作成、`PropertyRegistry` 検索 |
-| その中で100坪以上 | 既存条件 + 面積条件 | 条件追加、再検索 |
-| 法人所有だけ | 既存条件 + `owner_type = 法人所有` | 条件追加、再検索 |
-| 所有者を表示 | 表示列に所有者を追加 | `current_display_fields` 更新 |
-| 抵当権があるものを除外 | 既存条件 + `has_mortgage = no` | 条件追加、再検索 |
+所有者名検索は重要だが、代表的な初回検索ではなく、検索結果や物件詳細から「この所有者は他にも物件を持っているのではないか」と考えたときの深掘り検索として扱う。
+
+| ユーザー入力 | 位置づけ | Claudeの解釈 | Bubble処理 |
+|---|---|---|---|
+| 中区で収益物件を探して | 初回検索 | `location contains 中区` + `income_rank = 収益物件` | `SearchConditionItem` 作成、`PropertyRegistry` 検索 |
+| その中で100坪以上 | 追加絞り込み | 既存条件 + 面積条件 | 条件追加、再検索 |
+| 法人所有だけ | 追加絞り込み | 既存条件 + `owner_type = 法人所有` | 条件追加、再検索 |
+| 所有者を表示 | 表示列変更 | 表示列に所有者を追加 | `current_display_fields` 更新 |
+| 抵当権があるものを除外 | 追加絞り込み | 既存条件 + `has_mortgage = no` | 条件追加、再検索 |
+| 〇〇さんの土地と建物を探して | 深掘り検索・関連物件探索 | `owner_name contains 〇〇` + 必要に応じて `registry_type in 土地, 建物` | 現在Conversation内または派生Conversationで関連物件検索 |
 
 ## 4.4 `property_detail` / 物件詳細画面
 
