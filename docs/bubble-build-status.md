@@ -157,3 +157,30 @@ Fix in this order:
 - CSV / Excel import workflow
 - Privacy Rules
 - Admin import confirmation UX
+
+## 2026-06-03 ai_search Issues fix note
+
+Created the detailed Bubble editor fix runbook at `docs/bubble-ai-search-issue-fix.md` and use it as the source of truth for the current Issues修正フェーズ.
+
+Priority for the current pass:
+
+1. Keep `ai_search` as `Type of content = Conversation` and ensure every navigation sends a `Conversation`.
+2. Set `RG property_results` to `Type of content = PropertyRegistry` and `Data source = Search for PropertyRegistries`.
+3. Set result row/action groups to `Type of content = PropertyRegistry` with data source from the current cell or parent group.
+4. Rewrite result cell text expressions to use `Parent group's PropertyRegistry`; format number and yes/no fields as text.
+5. In candidate-save Workflow, create `CandidateProperty` with `property_registry = Parent group's PropertyRegistry`, `user = Current User`, `conversation = Current page Conversation`, and `status = 未調査`.
+6. In analyze-row Workflow, create `Message` with `conversation = Current page Conversation`, `role = user`, `intent_type = analyze_results`, and `content = この物件を分析して`.
+
+Do not proceed to Claude API Connector fixes until these Bubble type/reference Issues are cleared.
+
+## 2026-06-06 PR creation note
+
+Codex Webの「PRを作成する」では、`.docx` のようなバイナリファイルが差分に含まれるとPR作成がキャンセルされる場合がある。
+
+そのため、クライアント提示用のWord互換ファイルは、GitHub/CodexのPR差分で扱えるテキスト形式のRTFとして管理する。
+
+- Wordで開くファイル: `docs/BukkenAiSearch_client_design_document.rtf`
+- 元Markdown: `docs/client-design-document.md`
+- RTF再生成コマンド: `python scripts/generate_rtf_from_markdown.py docs/client-design-document.md docs/BukkenAiSearch_client_design_document.rtf`
+
+`main` に反映するには、Codex Web右上の「PRを作成する」をクリックし、GitHubで作成されたPull RequestをMergeする。
